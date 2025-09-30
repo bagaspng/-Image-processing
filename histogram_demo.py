@@ -1,149 +1,105 @@
 import argparse
 from pathlib import Path
-
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
 
-def compute_hist_grayscale(gray):
-    """Histogram grayscale: 256 bin (0..255)."""
-    hist = cv2.calcHist([gray], [0], None, [256], [0, 256]).ravel()
-    return hist
-
-
-def compute_hist_rgb(rgb):
-    """Histogram RGB per-channel (R, G, B)."""
-    h_r = cv2.calcHist([rgb], [0], None, [256], [0, 256]).ravel()  # R
-    h_g = cv2.calcHist([rgb], [1], None, [256], [0, 256]).ravel()  # G
-    h_b = cv2.calcHist([rgb], [2], None, [256], [0, 256]).ravel()  # B
-    return h_r, h_g, h_b
-
-
-def compute_hist_binary(binary):
-    """
-    Histogram biner (idealnya dua spike: 0 dan 255).
-    Tetap hitung 256 bin agar konsisten, puncak akan muncul di indeks 0 dan 255.
-    """
-    hist = cv2.calcHist([binary], [0], None, [256], [0, 256]).ravel()
-    return hist
-
-
-def to_binary(gray, thresh=None):
-    """
-    Thresholding ke citra biner.
-    - Jika thresh=None: gunakan Otsu.
-    - Jika thresh diset (0..255): gunakan nilai tersebut.
-    """
-    if thresh is None:
-        _, bin_img = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+def save_image(img, filename, cmap=None):
+    """Simpan citra ke file."""
+    plt.figure()
+    if cmap:
+        plt.imshow(img, cmap=cmap, vmin=0, vmax=255)
     else:
-        t = int(np.clip(thresh, 0, 255))
-        _, bin_img = cv2.threshold(gray, t, 255, cv2.THRESH_BINARY)
-    return bin_img
+        plt.imshow(img)
+    plt.axis("off")
+    plt.title(filename)
+    plt.savefig(filename, bbox_inches="tight")
+    plt.close()
+
+
+def save_histogram_gray_or_bin(hist_data, filename, color="k", title="Histogram"):
+    """Simpan histogram grayscale/biner."""
+    plt.figure()
+    plt.plot(hist_data, color=color)
+    plt.xlim([0, 255])
+    plt.xlabel("Intensitas")
+    plt.ylabel("Frekuensi")
+    plt.title(title)
+    plt.savefig(filename, bbox_inches="tight")
+    plt.close()
+
+
+def save_histogram_rgb(h_r, h_g, h_b, filename):
+    """Simpan histogram RGB dalam 3 subplot (Red, Green, Blue)."""
+    plt.figure(figsize=(10, 6))
+
+    plt.subplot(3, 1, 1)
+    plt.plot(h_r, color="r")
+    plt.title("Histogram Red")
+    plt.xlim([0, 255])
+
+    plt.subplot(3, 1, 2)
+    plt.plot(h_g, color="g")
+    plt.title("Histogram Green")
+    plt.xlim([0, 255])
+
+    plt.subplot(3, 1, 3)
+    plt.plot(h_b, color="b")
+    plt.title("Histogram Blue")
+    plt.xlim([0, 255])
+
+    plt.tight_layout()
+    plt.savefig(filename, bbox_inches="tight")
+    plt.close()
+
+
+def compute_hist(img, channel=None):
+    """Hitung histogram (0..255)."""
+    if channel is None:  # grayscale/biner
+        return cv2.calcHist([img], [0], None, [256], [0, 256]).ravel()
+    else:  # channel tertentu
+        return cv2.calcHist([img], [channel], None, [256], [0, 256]).ravel()
 
 
 def main(image_path, thresh):
-    # 1) Baca gambar (BGR), lalu konversi ke RGB & Grayscale
+    # Baca gambar
     bgr = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
-    if bgr is None:
-        raise FileNotFoundError(f"Gambar tidak ditemukan: {image_path}")
     rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
     gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
 
-    # 2) Biner
-    binary = to_binary(gray, thresh=thresh)
+    # Threshold biner
+    if thresh is None:
+        _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    else:
+        _, binary = cv2.threshold(gray, int(thresh), 255, cv2.THRESH_BINARY)
 
-    # 3) Hitung histogram
-    h_gray = compute_hist_grayscale(gray)
-    h_r, h_g, h_b = compute_hist_rgb(rgb)
-    h_bin = compute_hist_binary(binary)
+    out_dir = Path("hasil_output")
+    out_dir.mkdir(exist_ok=True)
 
-    # 4) Tampilkan hasil
-    plt.figure(figsize=(13, 10))
+    # Simpan RGB
+    save_image(rgb, str(out_dir / "rgb_image.png"))
+    h_r = compute_hist(rgb, 0)
+    h_g = compute_hist(rgb, 1)
+    h_b = compute_hist(rgb, 2)
+    save_histogram_rgb(h_r, h_g, h_b, str(out_dir / "rgb_histogram.png"))
 
-    # Baris 1: Gambar
-    plt.subplot(3, 3, 1)
-    plt.imshow(rgb)
-    plt.title("RGB")
-    plt.axis("off")
+    # Simpan Grayscale
+    save_image(gray, str(out_dir / "grayscale_image.png"), cmap="gray")
+    h_gray = compute_hist(gray)
+    save_histogram_gray_or_bin(h_gray, str(out_dir / "grayscale_histogram.png"),
+                               color="black", title="Histogram Grayscale")
 
-    plt.subplot(3, 3, 2)
-    plt.imshow(gray, cmap="gray", vmin=0, vmax=255)
-    plt.title("Grayscale")
-    plt.axis("off")
-
-    plt.subplot(3, 3, 3)
-    plt.imshow(binary, cmap="gray", vmin=0, vmax=255)
-    plt.title("Binary")
-    plt.axis("off")
-
-    # Baris 2: Histogram RGB (3 kanal dipisah)
-    plt.subplot(3, 3, 4)
-    plt.plot(h_r)
-    plt.title("Histogram R")
-    plt.xlim([0, 255])
-    plt.xlabel("Intensitas")
-    plt.ylabel("Frekuensi")
-
-    plt.subplot(3, 3, 5)
-    plt.plot(h_g)
-    plt.title("Histogram G")
-    plt.xlim([0, 255])
-    plt.xlabel("Intensitas")
-    plt.ylabel("Frekuensi")
-
-    plt.subplot(3, 3, 6)
-    plt.plot(h_b)
-    plt.title("Histogram B")
-    plt.xlim([0, 255])
-    plt.xlabel("Intensitas")
-    plt.ylabel("Frekuensi")
-
-    # Baris 3: Histogram Grayscale & Binary
-    plt.subplot(3, 3, 7)
-    plt.plot(h_gray)
-    plt.title("Histogram Grayscale")
-    plt.xlim([0, 255])
-    plt.xlabel("Intensitas")
-    plt.ylabel("Frekuensi")
-
-    plt.subplot(3, 3, 8)
-    plt.bar(np.arange(256), h_bin, width=1.0)
-    plt.title("Histogram Binary (spike di 0 dan 255)")
-    plt.xlim([0, 255])
-    plt.xlabel("Intensitas")
-    plt.ylabel("Frekuensi")
-
-    # Info singkat
-    total_pixels = gray.size
-    zeros = int(h_bin[0])
-    twfiv = int(h_bin[255])
-    plt.subplot(3, 3, 9)
-    plt.axis("off")
-    plt.text(
-        0.0, 0.8,
-        f"Total piksel : {total_pixels:,}\n"
-        f"Binary 0 (hitam): {zeros:,}\n"
-        f"Binary 255 (putih): {twfiv:,}\n"
-        f"Threshold: {'Otsu' if thresh is None else thresh}",
-        fontsize=10
-    )
-
-    plt.tight_layout()
-    plt.show()
+    # Simpan Binary
+    save_image(binary, str(out_dir / "binary_image.png"), cmap="gray")
+    h_bin = compute_hist(binary)
+    save_histogram_gray_or_bin(h_bin, str(out_dir / "binary_histogram.png"),
+                               color="blue", title="Histogram Binary")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Demo histogram untuk citra RGB, Grayscale, dan Binary."
-    )
-    parser.add_argument("--image", required=True, type=Path, help="Path file gambar input (jpg/png, dsb).")
-    parser.add_argument(
-        "--thresh",
-        type=int,
-        default=None,
-        help="Nilai threshold 0..255 untuk biner. Kosongkan untuk Otsu."
-    )
+    parser = argparse.ArgumentParser(description="Pisahkan output histogram per citra")
+    parser.add_argument("--image", required=True, type=Path, help="Path gambar input")
+    parser.add_argument("--thresh", type=int, default=None, help="Threshold (0..255), kosong = Otsu")
     args = parser.parse_args()
     main(args.image, args.thresh)
