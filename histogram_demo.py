@@ -4,7 +4,6 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-
 def save_image(img, filename, cmap=None):
     """Simpan citra ke file."""
     plt.figure()
@@ -17,7 +16,6 @@ def save_image(img, filename, cmap=None):
     plt.savefig(filename, bbox_inches="tight")
     plt.close()
 
-
 def save_histogram_gray_or_bin(hist_data, filename, color="k", title="Histogram"):
     """Simpan histogram grayscale/biner."""
     plt.figure()
@@ -28,7 +26,6 @@ def save_histogram_gray_or_bin(hist_data, filename, color="k", title="Histogram"
     plt.title(title)
     plt.savefig(filename, bbox_inches="tight")
     plt.close()
-
 
 def save_histogram_rgb(h_r, h_g, h_b, filename):
     """Simpan histogram RGB dalam 3 subplot (Red, Green, Blue)."""
@@ -53,14 +50,12 @@ def save_histogram_rgb(h_r, h_g, h_b, filename):
     plt.savefig(filename, bbox_inches="tight")
     plt.close()
 
-
 def compute_hist(img, channel=None):
     """Hitung histogram (0..255)."""
     if channel is None:  # grayscale/biner
         return cv2.calcHist([img], [0], None, [256], [0, 256]).ravel()
     else:  # channel tertentu
         return cv2.calcHist([img], [channel], None, [256], [0, 256]).ravel()
-
 
 def main(image_path, thresh):
     # Baca gambar
@@ -95,7 +90,6 @@ def main(image_path, thresh):
     h_bin = compute_hist(binary)
     save_histogram_gray_or_bin(h_bin, str(out_dir / "binary_histogram.png"),
                                color="blue", title="Histogram Binary")
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pisahkan output histogram per citra")
